@@ -1,0 +1,30 @@
+// 单机使用与专服相同的槽位限制和物品迁移实现。
+sourceSets.main.java.srcDir rootProject.file('server/src/main/java')
+dependencies {
+    modImplementation files(new File(rootProject.frameworkDir,
+            'build/libs/kizuna-inventory-ui-framework-0.1.0-SNAPSHOT.jar'))
+    modImplementation files(new File(rootProject.frameworkDir,
+            'server/build/libs/kizuna-inventory-ui-framework-server-0.1.0-SNAPSHOT.jar'))
+    modImplementation files(new File(rootProject.bs3dDir,
+            'client/build/libs/backpack-storage-3d-client-0.1.0-SNAPSHOT.jar'))
+    modImplementation files(new File(rootProject.bs3dDir,
+            'server/build/libs/backpack-storage-3d-server-0.1.0-SNAPSHOT.jar'))
+    modImplementation files(new File(rootProject.vanillaDir,
+            'client/build/libs/bs3d-vanilla-addon-client-0.1.0-SNAPSHOT.jar'))
+    modImplementation 'io.wispforest:owo-lib:0.11.2+1.20'
+    implementation 'org.tomlj:tomlj:1.1.1'
+    implementation 'org.antlr:antlr4-runtime:4.11.1'
+}
+processResources {
+    from(rootProject.file('server/src/main/resources')) { exclude 'fabric.mod.json' }
+}
+loom.runs {
+    smoke {
+        client()
+        source sourceSets.smoke
+        runDir "../build/smoke/${rootProject.findProperty('smokeRun') ?: 'manual'}/client"
+        property 'pocket.smoke.mode', rootProject.findProperty('smokeMode') ?: 'dedicated'
+        property 'pocket.smoke.address', "127.0.0.1:${rootProject.findProperty('smokePort') ?: '25587'}"
+        programArgs '--username', 'PocketSmoke', '--width', '1280', '--height', '720'
+    }
+}

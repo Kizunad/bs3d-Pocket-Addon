@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "bs3d_pocket",
+  "version": "${version}",
+  "name": "BS3D Pocket Addon",
+  "description": "Optional: vanilla main inventory keeps one pocket row plus the hotbar.",
+  "environment": "client",
+  "authors": [
+    "Kizunad"
+  ],
+  "license": "MIT",
+  "entrypoints": {
+    "main": [
+      "dev.kizuna.bs3d.pocket.server.PocketServer"
+    ],
+    "client": [
+      "dev.kizuna.bs3d.pocket.client.PocketClient"
+    ]
+  },
+  "depends": {
+    "java": ">=17",
+    "minecraft": "1.20.1",
+    "fabricloader": ">=0.16.10",
+    "fabric-api": ">=0.92.3+1.20.1",
+    "backpack_storage_3d": "0.1.0-SNAPSHOT",
+    "bs3d_vanilla_addon": "0.1.0-SNAPSHOT"
+  },
+  "mixins": [
+    "bs3d.pocket.mixins.json",
+    "bs3d.pocket.client.mixins.json"
+  ]
+}

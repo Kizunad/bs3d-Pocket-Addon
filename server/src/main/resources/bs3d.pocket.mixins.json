@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "dev.kizuna.bs3d.pocket.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "bs3d.pocket.refmap.json",
+  "mixins": [
+    "PlayerInventoryMixin",
+    "ScreenHandlerMixin",
+    "SlotMixin",
+    "ServerPlayNetworkHandlerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

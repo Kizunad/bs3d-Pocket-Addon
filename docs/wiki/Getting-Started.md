@@ -2,17 +2,14 @@
 
 需要 Minecraft 1.20.1、Java 17、Fabric Loader 0.16.10、Fabric API 0.92.3+1.20.1，以及同一批源码构建的 Framework、BS3D 与 Vanilla-Addon。四个项目均使用 `0.1.0-SNAPSHOT`，仅凭文件名无法区分源码版本。
 
-本附属依赖的接口：BS3D 的 `InventoryAccess.tryStoreCarried`，Vanilla-Addon 的 `PlayerInventoryRows`、`StationHost.stationLayout`、`StationHost.stationSlotVisible`、`StationHost.stationMenuSlot`、`SlotPosition` 与创造物品栏页签的场景接入。配套源码状态记录在[验证记录](Validation.md)。依次构建 Framework、BS3D、Vanilla-Addon，最后在本仓库执行：
+本附属依赖的接口：BS3D 的 `InventoryAccess.tryStoreCarried`，Vanilla-Addon 的 `PlayerInventoryRows`、`StationHost.stationLayout`、`StationHost.stationSlotVisible`、`StationHost.stationMenuSlot`、`SlotPosition` 与创造物品栏页签的场景接入。配套源码状态记录在[验证记录](Validation.md)。Framework、BS3D 与 Vanilla-Addon 以组合构建接入，随本仓构建先行编译，在本仓库执行：
 
 ```bash
-./gradlew -Dorg.gradle.java.home=/path/to/jdk17 \
-  -PframeworkDir=/path/to/Kizuna-Inventory-UI-Framework \
-  -Pbs3dDir=/path/to/backpack-and-storage-3D \
-  -PvanillaDir=/path/to/bs3d-Vanilla-Addon test build
+./gradlew -Dorg.gradle.java.home=/path/to/jdk21 test build
 python3 scripts/wiki.py check
 ```
 
-默认依赖目录为相邻的 `../Kizuna-Inventory-UI-Framework`、`../backpack-and-storage-3D` 和 `../bs3d-Vanilla-Addon`。Gradle Wrapper 已提交，不需要全局安装 Gradle；首次构建需要网络下载依赖。
+构建还需要相邻的 `Kizuna-Meridian-Mod-Framework`：`settings.gradle` 应用其 `scripts/workspace.gradle`，上述版本与 Gradle 8.14.6、Fabric Loom 1.13.6 都取自其版本目录 `scripts/libs.versions.toml`。默认依赖目录为相邻的 `../Kizuna-Inventory-UI-Framework`、`../backpack-and-storage-3D` 和 `../bs3d-Vanilla-Addon`，其他布局用 `-Pkizuna.dir.inventory-ui=…`、`-Pkizuna.dir.bs3d=…`、`-Pkizuna.dir.bs3d-vanilla=…` 指定。Gradle 须在 Java 21 上运行（Loom 1.13 的要求），产物仍以 Java 17 为目标。Gradle Wrapper 已提交，不需要全局安装 Gradle；首次构建需要网络下载依赖。
 
 产物：
 

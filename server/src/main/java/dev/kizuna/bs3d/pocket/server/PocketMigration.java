@@ -2,13 +2,13 @@ package dev.kizuna.bs3d.pocket.server;
 
 import dev.kizuna.backpack3d.server.InventoryAccess;
 import dev.kizuna.bs3d.pocket.api.PocketSlots;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 
 /** 从旧存档或外部写入收回不可用槽位，最终剩余物品进入真实世界。 */
 public final class PocketMigration {
@@ -19,7 +19,7 @@ public final class PocketMigration {
         // 整理由服务器主线程执行，不保存跨 tick 的物品副本。
     }
 
-    public static void clean(ServerPlayerEntity player) {
+    public static void clean(ServerPlayer player) {
         // 死亡掉落由原版完成；旁观者无法拾取脚边物品，切回其他模式后再整理。
         if (!player.isAlive() || player.isSpectator()) {
             return;
@@ -28,45 +28,45 @@ public final class PocketMigration {
         int moved = 0;
         int dropped = 0;
         for (int slot = PocketSlots.AVAILABLE_SLOTS; slot < PocketSlots.VANILLA_MAIN_SLOTS; slot++) {
-            if (inventory.getStack(slot).isEmpty()) {
+            if (inventory.getItem(slot).isEmpty()) {
                 continue;
             }
-            ItemStack stack = inventory.removeStack(slot);
+            ItemStack stack = inventory.removeItemNoUpdate(slot);
             moved += stack.getCount();
             dropped += relocate(player, stack);
         }
         if (moved == 0) {
             return;
         }
-        inventory.markDirty();
-        player.playerScreenHandler.sendContentUpdates();
-        player.currentScreenHandler.sendContentUpdates();
+        inventory.setChanged();
+        player.inventoryMenu.broadcastChanges();
+        player.containerMenu.broadcastChanges();
         if (dropped > 0) {
-            player.sendMessage(Text.translatable(OVERFLOW_KEY), true /* overlay */);
+            player.displayClientMessage(Component.translatable(OVERFLOW_KEY), true /* overlay */);
         }
-        LOGGER.info("整理玩家 {} 的旧背包槽：迁出 {} 件，掉落 {} 件", player.getUuidAsString(), moved, dropped);
+        LOGGER.info("整理玩家 {} 的旧背包槽：迁出 {} 件，掉落 {} 件", player.getStringUUID(), moved, dropped);
     }
 
-    private static int relocate(ServerPlayerEntity player, ItemStack stack) {
+    private static int relocate(ServerPlayer player, ItemStack stack) {
         // 依次放入口袋、随身容器，剩余数量掉在脚边并返回。
         var inventory = player.getInventory();
         if (hasRoom(inventory, stack)) {
-            inventory.insertStack(stack);
+            inventory.add(stack);
         }
         if (stack.isEmpty() || storeCarried(player, stack)) {
             return 0;
         }
         int dropped = stack.getCount();
-        player.dropItem(stack, true /* throwRandomly */, false /* retainOwnership */);
+        player.drop(stack, true /* throwRandomly */, false /* retainOwnership */);
         return dropped;
     }
 
-    private static boolean hasRoom(PlayerInventory inventory, ItemStack stack) {
+    private static boolean hasRoom(Inventory inventory, ItemStack stack) {
         // 原版创造模式在一件都放不下时会清空物品，先确认存在空间再插入。
-        return inventory.getOccupiedSlotWithRoomForStack(stack) >= 0 || inventory.getEmptySlot() >= 0;
+        return inventory.getSlotWithRemainingSpace(stack) >= 0 || inventory.getFreeSlot() >= 0;
     }
 
-    private static boolean storeCarried(ServerPlayerEntity player, ItemStack stack) {
+    private static boolean storeCarried(ServerPlayer player, ItemStack stack) {
         // 复用 BS3D 容量与嵌套验证；磁盘失败时物品仍在手中，随后安全掉落。
         try {
             return InventoryAccess.tryStoreCarried(player, stack);

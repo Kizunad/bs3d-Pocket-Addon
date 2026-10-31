@@ -1,21 +1,21 @@
 package dev.kizuna.bs3d.pocket.server;
 
-import net.minecraft.entity.ItemEntity;
-import net.minecraft.entity.player.PlayerAbilities;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.screen.PlayerScreenHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
 import sun.misc.Unsafe;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Abilities;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.item.ItemStack;
 
 /** 不创建世界的测试玩家：跳过实体构造，只接上真实库存、玩家菜单，并记录掉落与提示。 */
-final class TestPlayer extends ServerPlayerEntity {
+final class TestPlayer extends ServerPlayer {
     final List<ItemStack> dropped = new ArrayList<>();
-    final List<Text> overlays = new ArrayList<>();
+    final List<Component> overlays = new ArrayList<>();
 
     private TestPlayer() {
         super(null, null, null);
@@ -29,14 +29,14 @@ final class TestPlayer extends ServerPlayerEntity {
         unsafeField.setAccessible(true /* flag */);
         var unsafe = (Unsafe) unsafeField.get(null);
         var player = (TestPlayer) unsafe.allocateInstance(TestPlayer.class);
-        var inventory = new PlayerInventory(player);
-        var handler = new PlayerScreenHandler(inventory, true /* onServer */, player);
-        assign(PlayerEntity.class, player, "inventory", inventory);
-        assign(PlayerEntity.class, player, "abilities", new PlayerAbilities());
-        assign(PlayerEntity.class, player, "playerScreenHandler", handler);
+        var inventory = new Inventory(player);
+        var handler = new InventoryMenu(inventory, true /* onServer */, player);
+        assign(Player.class, player, "inventory", inventory);
+        assign(Player.class, player, "abilities", new Abilities());
+        assign(Player.class, player, "inventoryMenu", handler);
         assign(TestPlayer.class, player, "dropped", new ArrayList<ItemStack>());
-        assign(TestPlayer.class, player, "overlays", new ArrayList<Text>());
-        player.currentScreenHandler = handler;
+        assign(TestPlayer.class, player, "overlays", new ArrayList<Component>());
+        player.containerMenu = handler;
         return player;
     }
 
@@ -60,18 +60,18 @@ final class TestPlayer extends ServerPlayerEntity {
 
     @Override
     public boolean isCreative() {
-        return getAbilities().creativeMode;
+        return getAbilities().instabuild;
     }
 
     @Override
-    public ItemEntity dropItem(ItemStack stack, boolean throwRandomly, boolean retainOwnership) {
+    public ItemEntity drop(ItemStack stack, boolean throwRandomly, boolean retainOwnership) {
         // 掉落实体需要世界；测试只观察掉出的物品与数量。
         dropped.add(stack.copy());
         return null;
     }
 
     @Override
-    public void sendMessage(Text message, boolean overlay) {
+    public void displayClientMessage(Component message, boolean overlay) {
         overlays.add(message);
     }
 }

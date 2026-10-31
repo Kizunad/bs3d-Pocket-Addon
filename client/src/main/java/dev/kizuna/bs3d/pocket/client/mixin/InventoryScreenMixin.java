@@ -4,17 +4,17 @@ import dev.kizuna.bs3d.pocket.client.PocketLayout;
 import dev.kizuna.bs3d.pocket.client.PocketPage;
 import dev.kizuna.bs3d.vanilla.client.StationHost;
 import dev.kizuna.bs3d.vanilla.client.StationLayout;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.screen.ingame.AbstractInventoryScreen;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.gui.screen.recipebook.RecipeBookWidget;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.screen.PlayerScreenHandler;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.inventory.Slot;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -28,23 +28,22 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** 原地改写原版 E 页：场景就绪时用紧凑布局，否则保留原版页面并裁掉两行主背包。 */
 @Mixin(InventoryScreen.class)
-public abstract class InventoryScreenMixin extends AbstractInventoryScreen<PlayerScreenHandler>
+public abstract class InventoryScreenMixin extends EffectRenderingInventoryScreen<InventoryMenu>
         implements StationHost {
     @Unique private static final int BS3D_POCKET_BUTTON_X_PIXELS = 104;
     @Unique private static final int BS3D_POCKET_BUTTON_Y_PIXELS = 61;
-    @Shadow @Final private RecipeBookWidget recipeBook;
-    @Unique private ClickableWidget bs3dPocket$recipeButton;
+    @Shadow @Final private RecipeBookComponent recipeBookComponent;
+    @Unique private AbstractWidget bs3dPocket$recipeButton;
 
-    protected InventoryScreenMixin(PlayerScreenHandler handler, PlayerInventory inventory, Text title) {
+    protected InventoryScreenMixin(InventoryMenu handler, Inventory inventory, Component title) {
         super(handler, inventory, title);
     }
 
     @ModifyArg(method = "init", at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/screen/ingame/InventoryScreen;addDrawableChild"
-                    + "(Lnet/minecraft/client/gui/Element;)Lnet/minecraft/client/gui/Element;"))
-    private Element bs3dPocket$recipeButton(Element button) {
+            target = "Lnet/minecraft/client/gui/screens/inventory/InventoryScreen;addRenderableWidget(Lnet/minecraft/client/gui/components/events/GuiEventListener;)Lnet/minecraft/client/gui/components/events/GuiEventListener;"))
+    private GuiEventListener bs3dPocket$recipeButton(GuiEventListener button) {
         // 配方书按钮是 E 页唯一的原版按钮，保留引用以便两种布局各自摆放。
-        bs3dPocket$recipeButton = (ClickableWidget) button;
+        bs3dPocket$recipeButton = (AbstractWidget) button;
         return button;
     }
 
@@ -55,7 +54,7 @@ public abstract class InventoryScreenMixin extends AbstractInventoryScreen<Playe
     }
 
     @Inject(method = "render", at = @At("HEAD"))
-    private void bs3dPocket$render(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo callback) {
+    private void bs3dPocket$render(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo callback) {
         // 每帧从原版坐标重新排版，窗口缩放、配方书开合与库存同步都会切换布局。
         bs3dPocket$arrange();
     }
@@ -85,25 +84,25 @@ public abstract class InventoryScreenMixin extends AbstractInventoryScreen<Playe
         var layout = PocketLayout.calculate(width, height);
         var menu = layout.menu();
         var button = layout.recipeButton();
-        x = menu.x();
-        y = menu.y();
-        backgroundHeight = menu.height();
-        PocketPage.arrangeCompact(handler, layout);
+        leftPos = menu.x();
+        topPos = menu.y();
+        imageHeight = menu.height();
+        PocketPage.arrangeCompact(this.menu, layout);
         bs3dPocket$recipeButton.setPosition(button.x(), button.y());
     }
 
     @Unique
     private void bs3dPocket$arrangeFallback() {
         // 按缩短后的高度居中，配方书按钮保持原版相对位置。
-        backgroundHeight = PocketPage.FALLBACK_HEIGHT_PIXELS;
-        x = recipeBook.findLeftEdge(width, backgroundWidth);
-        y = (height - backgroundHeight) / 2;
-        PocketPage.arrangeFallback(handler);
-        bs3dPocket$recipeButton.setPosition(x + BS3D_POCKET_BUTTON_X_PIXELS, y + BS3D_POCKET_BUTTON_Y_PIXELS);
+        imageHeight = PocketPage.FALLBACK_HEIGHT_PIXELS;
+        leftPos = recipeBookComponent.updateScreenPosition(width, imageWidth);
+        topPos = (height - imageHeight) / 2;
+        PocketPage.arrangeFallback(menu);
+        bs3dPocket$recipeButton.setPosition(leftPos + BS3D_POCKET_BUTTON_X_PIXELS, topPos + BS3D_POCKET_BUTTON_Y_PIXELS);
     }
 
-    @Inject(method = "drawBackground", at = @At("HEAD"), cancellable = true)
-    private void bs3dPocket$compactBackground(DrawContext context, float delta, int mouseX, int mouseY,
+    @Inject(method = "renderBg", at = @At("HEAD"), cancellable = true)
+    private void bs3dPocket$compactBackground(GuiGraphics context, float delta, int mouseX, int mouseY,
                                              CallbackInfo callback) {
         // 紧凑页不画二维人物、盔甲与副手，这些由左侧三维模型承担。
         if (!bs3dPocket$compact()) {
@@ -114,23 +113,23 @@ public abstract class InventoryScreenMixin extends AbstractInventoryScreen<Playe
         callback.cancel();
     }
 
-    @Redirect(method = "drawBackground", at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/DrawContext;drawTexture(Lnet/minecraft/util/Identifier;IIIIII)V"))
-    private void bs3dPocket$fallbackBackground(DrawContext context, Identifier texture, int left, int top,
+    @Redirect(method = "renderBg", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/GuiGraphics;blit(Lnet/minecraft/resources/ResourceLocation;IIIIII)V"))
+    private void bs3dPocket$fallbackBackground(GuiGraphics context, ResourceLocation texture, int left, int top,
                                               int u, int v, int regionWidth, int regionHeight) {
         // 退回布局只裁掉被移除的两行，二维人物仍由原版在原位置绘制。
         PocketPage.drawFallback(context, texture, left, top);
     }
 
-    @Inject(method = "drawForeground", at = @At("HEAD"), cancellable = true)
-    private void bs3dPocket$foreground(DrawContext context, int mouseX, int mouseY, CallbackInfo callback) {
+    @Inject(method = "renderLabels", at = @At("HEAD"), cancellable = true)
+    private void bs3dPocket$foreground(GuiGraphics context, int mouseX, int mouseY, CallbackInfo callback) {
         // 合成标题已随右侧合成面板绘制，底部菜单不再重复。
         if (bs3dPocket$compact()) {
             callback.cancel();
         }
     }
 
-    @Inject(method = "isClickOutsideBounds", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "hasClickedOutside", at = @At("HEAD"), cancellable = true)
     private void bs3dPocket$outside(double mouseX, double mouseY, int left, int top, int button,
                                    CallbackInfoReturnable<Boolean> callback) {
         // 合成面板位于原版背景之外，点在其中不能被原版解析为丢出光标物品。

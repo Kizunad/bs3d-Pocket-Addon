@@ -13,7 +13,7 @@ public final class PocketServer implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> PocketMigration.clean(handler.player));
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> PocketMigration.clean(newPlayer));
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            for (var player : server.getPlayerManager().getPlayerList()) {
+            for (var player : server.getPlayerList().getPlayers()) {
                 PocketMigration.clean(player);
             }
         });

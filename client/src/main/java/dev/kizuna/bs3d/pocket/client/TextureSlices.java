@@ -1,12 +1,12 @@
 package dev.kizuna.bs3d.pocket.client;
 
 import dev.kizuna.bs3d.vanilla.client.SlotPosition;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.screen.slot.Slot;
-import net.minecraft.util.Identifier;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.inventory.Slot;
 
 /** 原版页面纹理按行切片拼接；槽位坐标与背景使用同一组切片平移。 */
 public record TextureSlices(int width, List<Slice> slices) {
@@ -30,10 +30,10 @@ public record TextureSlices(int width, List<Slice> slices) {
         move(slot, vanilla.x(), vanilla.y() + offset(vanilla.y()));
     }
 
-    public void draw(DrawContext context, Identifier texture, int left, int top) {
+    public void draw(GuiGraphics context, ResourceLocation texture, int left, int top) {
         // 每段按原版纹理一比一绘制，槽位边框与槽位坐标使用同一组切片。
         for (Slice slice : slices) {
-            context.drawTexture(texture, left, top + slice.targetY(), 0, slice.sourceY(), width, slice.height());
+            context.blit(texture, left, top + slice.targetY(), 0, slice.sourceY(), width, slice.height());
         }
     }
 

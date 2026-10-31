@@ -6,10 +6,10 @@
 
 Java 17 离线 `test build` 通过。服务端 **6 项**、客户端 **4 项**，共 **10 项测试**，无失败或跳过。配套 BS3D 的 **130 项**测试和 Vanilla-Addon 的 **5 项**测试也通过。
 
-服务端测试使用真实的 `PlayerInventory` 与 `PlayerScreenHandler`：
+服务端测试使用真实的 `Inventory` 与 `InventoryMenu`：
 
-- `insertStack` 只填 0–17，第 19 组物品原样留给调用者，指定 18 号槽插入失败。
-- 口袋满时 `offerOrDrop` 掉在脚边，副手同类物品仍按原版优先合并。
+- `Inventory.add` 只填 0–17，第 19 组物品原样留给调用者，指定 18 号槽插入失败。
+- 口袋满时 `placeItemBackInInventory` 掉在脚边，副手同类物品仍按原版优先合并。
 - 伪造的拿取、Shift、数字键、丢出、复制点击指向 18–35 时，槽位和光标都不变。
 - 拖动分配跳过被移除槽位。
 - 快捷栏 Shift 搬运只进口袋行，口袋行满时物品留在快捷栏。

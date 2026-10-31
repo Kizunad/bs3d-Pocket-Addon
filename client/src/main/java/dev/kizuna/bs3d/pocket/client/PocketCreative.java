@@ -5,9 +5,9 @@ import dev.kizuna.bs3d.pocket.client.TextureSlices.Slice;
 import dev.kizuna.bs3d.pocket.server.PocketClicks;
 import dev.kizuna.bs3d.vanilla.client.PlayerInventoryRows;
 import dev.kizuna.bs3d.vanilla.client.PlayerInventoryView;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.screen.slot.Slot;
 import java.util.List;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.Slot;
 
 /** 创造模式「物品栏」页签：三维场景启用时只留口袋行、快捷栏与删除格，否则保留原版上半页。 */
 public final class PocketCreative {
@@ -43,9 +43,9 @@ public final class PocketCreative {
         if (!fallbackVisible(menuSlot)) {
             return false;
         }
-        if (!(menuSlot.inventory instanceof PlayerInventory)) {
+        if (!(menuSlot.container instanceof Inventory)) {
             return false;
         }
-        return menuSlot.getIndex() < PlayerInventory.MAIN_SIZE;
+        return menuSlot.getContainerSlot() < Inventory.INVENTORY_SIZE;
     }
 }

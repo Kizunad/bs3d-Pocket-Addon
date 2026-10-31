@@ -4,20 +4,20 @@
 
 ## 服务器规则
 
-被移除的槽位以**实际库存槽号**判定：`slot.inventory` 为 `PlayerInventory` 且槽号位于 18–35。不同菜单的槽位编号不同，不能把菜单槽号当作库存槽号。
+被移除的槽位以**实际库存槽号**判定：`slot.container` 为 `Inventory` 且槽号位于 18–35。不同菜单的槽位编号不同，不能把菜单槽号当作库存槽号。
 
 | 入口 | 处理 |
 | --- | --- |
-| `PlayerInventory.getEmptySlot` / `getOccupiedSlotWithRoomForStack` / `getSlotWithStack` / `indexOf` | 只扫描 0–17，选中格和副手的原版合并优先级不变 |
-| `PlayerInventory.insertStack(int, ItemStack)` | 指定 18–35 视为放不下，调用者保留原栈 |
-| `ScreenHandler.onSlotClick`（`ClickSlotC2SPacket`） | 点击指向被移除槽位时整次拒绝，光标和槽位都不变 |
-| `ScreenHandler.insertItem`（Shift 搬运、Vanilla-Addon 自动取回） | 合并阶段与空格阶段都跳过被移除槽位 |
-| `Slot.canInsert` / `Slot.canTakeItems` | 被移除槽位一律返回 false，覆盖 BS3D 与第三方的直接调用 |
-| `CreativeInventoryActionC2SPacket` | 指向被移除槽位时拒绝，并整页重发玩家菜单以撤销客户端预测 |
+| `Inventory.getFreeSlot` / `getSlotWithRemainingSpace` / `findSlotMatchingItem` / `findSlotMatchingUnusedItem` | 只扫描 0–17，选中格和副手的原版合并优先级不变 |
+| `Inventory.add(int, ItemStack)` | 指定 18–35 视为放不下，调用者保留原栈 |
+| `AbstractContainerMenu.clicked`（`ServerboundContainerClickPacket`） | 点击指向被移除槽位时整次拒绝，光标和槽位都不变 |
+| `AbstractContainerMenu.moveItemStackTo`（Shift 搬运、Vanilla-Addon 自动取回） | 合并阶段与空格阶段都跳过被移除槽位 |
+| `Slot.mayPlace` / `Slot.mayPickup` | 被移除槽位一律返回 false，覆盖 BS3D 与第三方的直接调用 |
+| `ServerboundSetCreativeModeSlotPacket` | 指向被移除槽位时拒绝，并整页重发玩家菜单以撤销客户端预测 |
 
-Vanilla-Addon 的拖放事务（`bs3d_vanilla:action`）最终都走原版点击或 `insertItem`，因此同样受上述规则约束；事务失败时按 Vanilla-Addon 的规则恢复整份库存。
+Vanilla-Addon 的拖放事务（`bs3d_vanilla:action`）最终都走原版点击或 `moveItemStackTo`，因此同样受上述规则约束；事务失败时按 Vanilla-Addon 的规则恢复整份库存。
 
-旧槽整理调用 BS3D `InventoryAccess.tryStoreCarried(ServerPlayerEntity, ItemStack)`：整堆放入随身容器或不放，失败（包括存档写入异常）时物品留在手中，随后掉在脚边。
+旧槽整理调用 BS3D `InventoryAccess.tryStoreCarried(ServerPlayer, ItemStack)`：整堆放入随身容器或不放，失败（包括存档写入异常）时物品留在手中，随后掉在脚边。
 
 ## 只读常量
 

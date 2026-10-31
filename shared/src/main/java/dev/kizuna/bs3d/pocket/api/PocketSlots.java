@@ -1,6 +1,6 @@
 package dev.kizuna.bs3d.pocket.api;
 
-import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.world.entity.player.Inventory;
 
 /** 可选附属的固定容量；快捷栏和原版存档结构保持独立。 */
 public final class PocketSlots {
@@ -8,7 +8,7 @@ public final class PocketSlots {
     public static final int VISIBLE_MAIN_SLOTS = 9;
     public static final int VISIBLE_MAIN_ROWS = VISIBLE_MAIN_SLOTS / HOTBAR_SLOTS;
     public static final int AVAILABLE_SLOTS = HOTBAR_SLOTS + VISIBLE_MAIN_SLOTS;
-    public static final int VANILLA_MAIN_SLOTS = PlayerInventory.MAIN_SIZE;
+    public static final int VANILLA_MAIN_SLOTS = Inventory.INVENTORY_SIZE;
 
     private PocketSlots() {
         // 公开只读容量，不提供运行时配置或第二份库存。

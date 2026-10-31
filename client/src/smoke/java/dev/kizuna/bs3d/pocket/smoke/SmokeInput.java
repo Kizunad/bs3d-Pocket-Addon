@@ -7,12 +7,12 @@ import dev.kizuna.backpack3d.client.WornPreview;
 import dev.kizuna.bs3d.vanilla.client.StationHost;
 import dev.kizuna.bs3d.vanilla.client.StationPanel;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.ScreenshotRecorder;
-import net.minecraft.screen.slot.Slot;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.world.inventory.Slot;
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -25,17 +25,17 @@ final class SmokeInput {
         // 静态工具，不保存任何页面或库存状态。
     }
 
-    static void pressKey(KeyBinding binding) {
+    static void pressKey(KeyMapping binding) {
         // 与键盘回调相同地累计按下次数，客户端 tick 按原版流程打开页面。
-        KeyBinding.onKeyPressed(KeyBindingHelper.getBoundKeyOf(binding));
+        KeyMapping.click(KeyBindingHelper.getBoundKeyOf(binding));
     }
 
-    static void closeWithKey(HandledScreen<?> screen, KeyBinding binding) {
+    static void closeWithKey(AbstractContainerScreen<?> screen, KeyMapping binding) {
         // 页面内再次按物品栏键，走原版 keyPressed 关闭路径。
-        screen.keyPressed(KeyBindingHelper.getBoundKeyOf(binding).getCode(), 0, 0);
+        screen.keyPressed(KeyBindingHelper.getBoundKeyOf(binding).getValue(), 0, 0);
     }
 
-    static int[] slotPoint(HandledScreen<?> screen, Slot slot) {
+    static int[] slotPoint(AbstractContainerScreen<?> screen, Slot slot) {
         // 原版槽位坐标相对于菜单原点。
         var host = (StationHost) screen;
         return new int[] {host.stationLeft() + slot.x + SLOT_CENTER_PIXELS,
@@ -48,14 +48,14 @@ final class SmokeInput {
         screen.mouseReleased(point[0], point[1], 0);
     }
 
-    static void drag(HandledScreen<?> screen, int[] source, int[] target) {
+    static void drag(AbstractContainerScreen<?> screen, int[] source, int[] target) {
         // 按下、移动、松开三步全部经过页面入口，由附属决定来源与落点。
         screen.mouseClicked(source[0], source[1], 0);
         screen.mouseDragged(target[0], target[1], 0, target[0] - source[0], target[1] - source[1]);
         screen.mouseReleased(target[0], target[1], 0);
     }
 
-    static int[] modelPoint(HandledScreen<?> screen, String bag) {
+    static int[] modelPoint(AbstractContainerScreen<?> screen, String bag) {
         // 只在人物场景里找容器模型的实际表面像素。
         WornPreview player = read(panel(screen), "player", WornPreview.class);
         Rect area = ((StationHost) screen).stationLayout().player();
@@ -69,7 +69,7 @@ final class SmokeInput {
         return null;
     }
 
-    static int[] bodyPoint(HandledScreen<?> screen, int inventorySlot) {
+    static int[] bodyPoint(AbstractContainerScreen<?> screen, int inventorySlot) {
         // 身体部位命中要求该像素没有被身上容器遮挡。
         WornPreview player = read(panel(screen), "player", WornPreview.class);
         float[] box = player.slotBounds(inventorySlot);
@@ -86,7 +86,7 @@ final class SmokeInput {
         return null;
     }
 
-    static int[] itemPoint(HandledScreen<?> screen, String bag) {
+    static int[] itemPoint(AbstractContainerScreen<?> screen, String bag) {
         // 内景尚未完成开盖渲染时返回 null，由调用方继续等待。
         Map<?, ?> interiors = read(panel(screen), "interiors", Map.class);
         var interior = (InteriorRenderer) interiors.get(bag);
@@ -104,7 +104,7 @@ final class SmokeInput {
         return null;
     }
 
-    static StationPanel panel(HandledScreen<?> screen) {
+    static StationPanel panel(AbstractContainerScreen<?> screen) {
         return ((StationHost) screen).stationPanel();
     }
 
@@ -129,7 +129,7 @@ final class SmokeInput {
     }
 
     private static Field field(Class<?> owner, String name) throws NoSuchFieldException {
-        // 原版页面字段可能声明在 HandledScreen 等父类。
+        // 原版页面字段可能声明在 AbstractContainerScreen 等父类。
         for (Class<?> type = owner; type != null; type = type.getSuperclass()) {
             for (Field field : type.getDeclaredFields()) {
                 if (field.getName().equals(name)) {
@@ -141,11 +141,11 @@ final class SmokeInput {
         throw new NoSuchFieldException(name);
     }
 
-    static AtomicBoolean screenshot(MinecraftClient client, String name) {
+    static AtomicBoolean screenshot(Minecraft client, String name) {
         // tick 内帧缓冲仍是上一帧；排到本帧绘制完成、交换缓冲之前再读，画面与本 tick 的状态一致。
         var saved = new AtomicBoolean();
         RenderSystem.recordRenderCall(() -> {
-            ScreenshotRecorder.saveScreenshot(client.runDirectory, name, client.getFramebuffer(), message -> {});
+            Screenshot.grab(client.gameDirectory, name, client.getMainRenderTarget(), message -> {});
             saved.set(true /* saved */);
         });
         return saved;

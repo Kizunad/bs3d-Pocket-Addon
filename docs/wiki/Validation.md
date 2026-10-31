@@ -1,5 +1,42 @@
 # 验证记录
 
+## 2026-11-01：迁移到 Minecraft 26.2 / Java 25
+
+运行环境改为 Minecraft 26.2、Fabric Loader 0.20.1、Fabric API 0.161.0+26.2、owo 0.13.1+26.2、Java 25，构建使用 Gradle 9.8.0、Fabric Loom 1.19.3。功能、槽位规则与存档格式不变，配套 Framework、BS3D 与 Vanilla-Addon 为同日迁移的 26.2 版本。
+
+跟随 26.2 调整的接入点：
+
+- 原版 `Inventory.findSlotMatchingUnusedItem` 改名为 `findSlotMatchingCraftingIngredient`，寻位限制随之改挂，四个寻位入口仍只扫描 0–17。
+- 26.2 的界面先提取后绘制。E 页与创造页的排版改在 `extractBackground` 开头（每帧最先提取的部分），背景裁接改为包住其中的纹理绘制与二维人物绘制。
+- 页面高度 `imageHeight` 改为 final，改由访问器写入。
+- E 页的配方书按钮改由父类私有方法加入。附属在初始化之后从子控件中取出唯一的图片按钮；退回布局时，页面左边缘经 Vanilla-Addon 的配方书访问器计算。
+- 点击窗口外的判断 `hasClickedOutside` 移到 `AbstractRecipeBookScreen` 声明，E 页改为覆写该方法。
+- 26.2 的文字绘制会跳过 alpha 为 0 的颜色，紧凑 E 页标题色改为带不透明 alpha 的同一灰色。
+
+Java 25 `test build :client:compileSmokeJava :server:compileSmokeJava` 通过：服务端 **6 项**、客户端 **6 项**，共 **12 项测试**，与迁移前相同，无失败或跳过。26.2 的物品默认组件在服务器加载数据时才绑定，服务端测试改为按原版内置注册表补绑一次。两端安装产物为 `jar` 任务输出，均不含 smoke 夹具或 refmap；专服 JAR 不含客户端或 owo 类。
+
+真实 Fabric 专服与 Xvfb（llvmpipe 软件渲染）客户端联调两种模式均通过，覆盖项与迁移前相同，日志同为「迁出 1152 件，掉落 704 件」：
+
+- `build/smoke/bf3333eaf73e-dedicated/client/pocket-ok.txt`
+- `build/smoke/d1ef2667ba72-integrated/client/pocket-ok.txt`
+
+箱子页玩家区只有口袋行加快捷栏，因此也覆盖了 Vanilla-Addon 可见行数小于 3 时的背景两段裁剪。
+
+联调探针随 26.2 时序做了三处调整，产品代码未改：
+
+- 26.2 每轮先 tick 再绘制，tick 内截图读到的是上一帧。探针改为记下帧号，等世界再绘制一帧后截图，并等文件写完再发下一次输入。
+- 原版包在服务端按 tick 排队处理，聊天命令则直接进入主线程。E 页关闭后，先等服务端把合成格剩余的原木退回背包，再发开箱子的命令；否则晚到的关闭包会把新开的箱子页关掉。
+- 服务端接受创造写入后不再回发该槽（真实页面已在本地预测）。伪造写入改为排在对照写入之后：伪造写入被拒时附属整页重发玩家菜单，客户端看到对照格变化，即说明两个包都已处理。清除对照物品时也按此确认。
+
+九张截图与 2026-10-31 的 1.20.1 截图（`build/smoke/30f30cfc0d3c-dedicated/client/screenshots/`）对比，页面布局、人物、内景和槽位内容一致。差别有四处：
+
+- 天空多了云层；
+- 平台在 26.2 下有光照，1.20.1 截图中为全黑；
+- 旧存档截图里，一块随机抛出的鹅卵石离镜头很近；
+- 死亡页底部的快捷栏已清空，因为截图改在死亡后的下一帧。
+
+README 截图仍为 1.20.1 版本，布局相同，未替换。未在 Windows 实例上验证。
+
 ## 2026-10-30：首个源码实现
 
 当前为未发布源码，API 未冻结。配套 BS3D 业务协议 **v7**、Vanilla-Addon 业务协议 **v2**，二者为同日未提交的源码，已包含本附属依赖的接入点：BS3D 的 `InventoryAccess.tryStoreCarried`，Vanilla-Addon 的 `PlayerInventoryRows`、`StationHost.stationLayout`、`StationHost.stationSlotVisible` 与 `SlotPosition`。

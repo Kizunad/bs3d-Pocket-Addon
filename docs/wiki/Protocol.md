@@ -8,7 +8,7 @@
 
 | 入口 | 处理 |
 | --- | --- |
-| `Inventory.getFreeSlot` / `getSlotWithRemainingSpace` / `findSlotMatchingItem` / `findSlotMatchingUnusedItem` | 只扫描 0–17，选中格和副手的原版合并优先级不变 |
+| `Inventory.getFreeSlot` / `getSlotWithRemainingSpace` / `findSlotMatchingItem` / `findSlotMatchingCraftingIngredient` | 只扫描 0–17，选中格和副手的原版合并优先级不变 |
 | `Inventory.add(int, ItemStack)` | 指定 18–35 视为放不下，调用者保留原栈 |
 | `AbstractContainerMenu.clicked`（`ServerboundContainerClickPacket`） | 点击指向被移除槽位时整次拒绝，光标和槽位都不变 |
 | `AbstractContainerMenu.moveItemStackTo`（Shift 搬运、Vanilla-Addon 自动取回） | 合并阶段与空格阶段都跳过被移除槽位 |

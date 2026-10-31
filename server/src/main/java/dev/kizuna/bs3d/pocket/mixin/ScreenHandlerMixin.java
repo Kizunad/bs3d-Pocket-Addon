@@ -3,7 +3,7 @@ package dev.kizuna.bs3d.pocket.mixin;
 import dev.kizuna.bs3d.pocket.server.PocketClicks;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(AbstractContainerMenu.class)
 public abstract class ScreenHandlerMixin {
     @Inject(method = "clicked", at = @At("HEAD"), cancellable = true)
-    private void bs3dPocket$click(int slot, int button, ClickType action, Player player,
+    private void bs3dPocket$click(int slot, int button, ContainerInput action, Player player,
                                  CallbackInfo callback) {
         // 拒绝时光标和旧槽都不变；原版点击包处理随后按真实库存纠正客户端预测。
         if (PocketClicks.blocked((AbstractContainerMenu) (Object) this, slot)) {

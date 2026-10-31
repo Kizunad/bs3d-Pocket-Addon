@@ -8,7 +8,7 @@ import net.minecraft.client.gui.screens.inventory.ContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.protocol.game.ServerboundSetCreativeModeSlotPacket;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
@@ -35,7 +35,7 @@ final class MenuProbe {
         // 返回 true 表示两类页面都已验收并回到生存模式。
         ticks++;
         boolean done = switch (step) {
-            case 0 -> command(client, "pocket-fixture chest");
+            case 0 -> openChest(client);
             case 1 -> chest(client);
             case 2 -> chestMoved(client);
             case 3 -> openCreative(client);
@@ -58,9 +58,23 @@ final class MenuProbe {
         return step > LAST_STEP;
     }
 
+    private static boolean openChest(Minecraft client) {
+        // 26.2 起原版包按 tick 处理、聊天命令直接进主线程，E 页的关闭包可能晚于命令，把新开的箱子页关掉。
+        // 服务端处理关闭时才把 2×2 里剩下的原木退回背包，看到原木回来再发命令。
+        if (client.gui.screen() != null) {
+            return false;
+        }
+        var inventory = client.player.getInventory();
+        if (SmokeStacks.count(inventory, Items.OAK_LOG, 0, PocketSlots.VANILLA_MAIN_SLOTS) != PocketFixture.LOG_COUNT - 1) {
+            return false;
+        }
+        SmokeInput.require(SmokeStacks.removedEmpty(inventory), "合成格退回的原木进入了被移除的槽位");
+        return command(client, "pocket-fixture chest");
+    }
+
     private boolean chest(Minecraft client) {
         // 真实箱子页面先断言玩家区两行，再用原版 Shift 点击把石头搬进玩家库存。
-        if (!(client.screen instanceof ContainerScreen screen)) {
+        if (!(client.gui.screen() instanceof ContainerScreen screen)) {
             return false;
         }
         if (!VanillaClient.instance().ready(screen) || ticks < SETTLE_TICKS) {
@@ -72,13 +86,13 @@ final class MenuProbe {
         if (!evidence.captured(client, "pocket-chest.png")) {
             return false;
         }
-        client.gameMode.handleInventoryMouseClick(handler.containerId, CHEST_SLOT, 0, ClickType.QUICK_MOVE, client.player);
+        client.gameMode.handleContainerInput(handler.containerId, CHEST_SLOT, 0, ContainerInput.QUICK_MOVE, client.player);
         return true;
     }
 
     private boolean chestMoved(Minecraft client) {
         // 等服务端回写稳定后检查：石头只能落在口袋行或快捷栏。
-        if (!(client.screen instanceof ContainerScreen screen)) {
+        if (!(client.gui.screen() instanceof ContainerScreen screen)) {
             return false;
         }
         if (!screen.getMenu().getSlot(CHEST_SLOT).getItem().isEmpty() || ticks < SETTLE_TICKS) {
@@ -94,7 +108,7 @@ final class MenuProbe {
 
     private static boolean openCreative(Minecraft client) {
         // 创造模式生效且页面已关闭后按物品栏键，由原版打开创造物品栏。
-        if (client.gameMode.getPlayerMode() != GameType.CREATIVE || client.screen != null) {
+        if (client.gameMode.getPlayerMode() != GameType.CREATIVE || client.gui.screen() != null) {
             return false;
         }
         SmokeInput.pressKey(client.options.keyInventory);
@@ -103,7 +117,7 @@ final class MenuProbe {
 
     private boolean selectTab(Minecraft client) {
         // 点击物品栏页签图标中心，走原版页签切换。
-        if (!(client.screen instanceof CreativeModeInventoryScreen screen) || ticks < SETTLE_TICKS) {
+        if (!(client.gui.screen() instanceof CreativeModeInventoryScreen screen) || ticks < SETTLE_TICKS) {
             return false;
         }
         CreativeModeTab tab = BuiltInRegistries.CREATIVE_MODE_TAB.stream()
@@ -185,7 +199,7 @@ final class MenuProbe {
     }
 
     private boolean returned(Minecraft client) {
-        // 头盔再次回到口袋格后，发送伪造的旧槽写入和一个合法对照写入。
+        // 头盔再次回到口袋格后，发送一个合法对照写入和伪造的旧槽写入。
         var screen = creativeScreen(client);
         var inventory = client.player.getInventory();
         if (screen == null || !EPageProbe.holds(inventory.getItem(pocket), Items.IRON_HELMET, 1)) {
@@ -193,14 +207,13 @@ final class MenuProbe {
         }
         SmokeInput.require(inventory.getItem(PocketFixture.HEAD_SLOT).isEmpty(), "头盔仍在头部");
         control = SmokeStacks.firstEmpty(inventory, PocketSlots.HOTBAR_SLOTS, PocketSlots.AVAILABLE_SLOTS);
-        send(client, FORGED_SLOT, new ItemStack(Items.DIAMOND));
-        send(client, control, new ItemStack(Items.DIAMOND));
+        sendThenForge(client, new ItemStack(Items.DIAMOND));
         return true;
     }
 
     private static CreativeModeInventoryScreen creativeScreen(Minecraft client) {
         // 只在物品栏页签、附属状态就绪且没有等待中的转移时推进。
-        if (!(client.screen instanceof CreativeModeInventoryScreen screen)) {
+        if (!(client.gui.screen() instanceof CreativeModeInventoryScreen screen)) {
             return null;
         }
         var addon = VanillaClient.instance();
@@ -214,26 +227,36 @@ final class MenuProbe {
     }
 
     private boolean forged(Minecraft client) {
-        // 对照写入回到客户端说明两个包都已处理；旧槽仍为空才算拒绝成功。
+        // 对照钻石随整页重发回到客户端，说明两个包都已处理；旧槽仍为空才算拒绝成功。
         var inventory = client.player.getInventory();
         if (!inventory.getItem(control).is(Items.DIAMOND) || ticks < SETTLE_TICKS) {
             return false;
         }
         SmokeInput.require(SmokeStacks.removedEmpty(inventory), "服务端接受了伪造的旧槽写入");
-        send(client, control, ItemStack.EMPTY);
+        sendThenForge(client, ItemStack.EMPTY);
         return true;
     }
 
     private boolean closeCreative(Minecraft client) {
-        // 对照物品清除后按物品栏键关闭页面并回到生存模式。
-        if (!client.player.getInventory().getItem(control).isEmpty()) {
+        // 对照物品清除且再次整页重发后，按物品栏键关闭页面并回到生存模式。
+        var inventory = client.player.getInventory();
+        if (!inventory.getItem(control).isEmpty()) {
             return false;
         }
-        if (!(client.screen instanceof CreativeModeInventoryScreen screen)) {
+        SmokeInput.require(SmokeStacks.removedEmpty(inventory), "服务端接受了伪造的旧槽写入");
+        if (!(client.gui.screen() instanceof CreativeModeInventoryScreen screen)) {
             throw new IllegalStateException("创造物品栏提前关闭");
         }
         SmokeInput.closeWithKey(screen, client.options.keyInventory);
         return command(client, "gamemode survival");
+    }
+
+    private void sendThenForge(Minecraft client, ItemStack stack) {
+        // 26.2 服务端接受创造写入后把远端槽记为新值、不再回发（真实页面已在本地预测）。
+        // 两个包在服务端同一队列按序处理：先写对照格，再写旧槽；旧槽被拒时附属整页重发玩家菜单，
+        // 客户端看到对照格的新内容，即说明两个包都已处理。
+        send(client, control, stack);
+        send(client, FORGED_SLOT, new ItemStack(Items.DIAMOND));
     }
 
     private static void send(Minecraft client, int slot, ItemStack stack) {

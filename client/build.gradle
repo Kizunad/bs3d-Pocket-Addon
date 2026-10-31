@@ -1,13 +1,13 @@
 // 单机使用与专服相同的槽位限制和物品迁移实现。
 sourceSets.main.java.srcDir rootProject.file('server/src/main/java')
 dependencies {
-    // 组合进来的 Loom 工程直接取 named 开发 JAR：按坐标走 mod 重映射的缓存不随上游改动刷新，也不会先构建上游。
-    implementation('dev.kizuna.inventoryui:kizuna-inventory-ui-framework') { targetConfiguration = 'namedElements' }
-    implementation('dev.kizuna.inventoryui:server') { targetConfiguration = 'namedElements' }
-    implementation('dev.kizuna.backpack3d:client') { targetConfiguration = 'namedElements' }
-    implementation('dev.kizuna.backpack3d:server') { targetConfiguration = 'namedElements' }
-    implementation('dev.kizuna.bs3d.vanilla:client') { targetConfiguration = 'namedElements' }
-    modImplementation libs.owo
+    // 组合工程按坐标替换为上游源码工程，直接取其普通 JAR，并随本仓先行构建。
+    implementation 'dev.kizuna.inventoryui:kizuna-inventory-ui-framework'
+    implementation 'dev.kizuna.inventoryui:server'
+    implementation 'dev.kizuna.backpack3d:client'
+    implementation 'dev.kizuna.backpack3d:server'
+    implementation 'dev.kizuna.bs3d.vanilla:client'
+    implementation libs.owo
     implementation libs.tomlj
     implementation libs.antlr.runtime
 }

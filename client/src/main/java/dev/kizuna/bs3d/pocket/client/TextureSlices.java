@@ -4,12 +4,15 @@ import dev.kizuna.bs3d.vanilla.client.SlotPosition;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.inventory.Slot;
 
 /** 原版页面纹理按行切片拼接；槽位坐标与背景使用同一组切片平移。 */
 public record TextureSlices(int width, List<Slice> slices) {
+    /** 原版容器页面纹理（玩家页与创造页签背景）均为 256×256。 */
+    public static final int TEXTURE_SIZE_PIXELS = 256;
     private static final Map<Slot, Position> VANILLA = new WeakHashMap<>();
 
     public int height() {
@@ -30,10 +33,11 @@ public record TextureSlices(int width, List<Slice> slices) {
         move(slot, vanilla.x(), vanilla.y() + offset(vanilla.y()));
     }
 
-    public void draw(GuiGraphics context, ResourceLocation texture, int left, int top) {
+    public void draw(GuiGraphicsExtractor context, Identifier texture, int left, int top) {
         // 每段按原版纹理一比一绘制，槽位边框与槽位坐标使用同一组切片。
         for (Slice slice : slices) {
-            context.blit(texture, left, top + slice.targetY(), 0, slice.sourceY(), width, slice.height());
+            context.blit(RenderPipelines.GUI_TEXTURED, texture, left, top + slice.targetY(), 0, slice.sourceY(),
+                    width, slice.height(), TEXTURE_SIZE_PIXELS, TEXTURE_SIZE_PIXELS);
         }
     }
 

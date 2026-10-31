@@ -1,17 +1,18 @@
 package dev.kizuna.bs3d.pocket.client.mixin;
 
+import com.mojang.blaze3d.pipeline.RenderPipeline;
 import dev.kizuna.bs3d.pocket.client.PocketCreative;
 import dev.kizuna.bs3d.pocket.client.TextureSlices;
 import dev.kizuna.bs3d.vanilla.client.StationHost;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
-import net.minecraft.client.gui.screens.inventory.EffectRenderingInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.CreativeModeTab;
@@ -29,7 +30,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(CreativeModeInventoryScreen.class)
 public abstract class CreativeInventoryScreenMixin
-        extends EffectRenderingInventoryScreen<CreativeModeInventoryScreen.ItemPickerMenu> implements StationHost {
+        extends AbstractContainerScreen<CreativeModeInventoryScreen.ItemPickerMenu> implements StationHost {
     @Shadow private static CreativeModeTab selectedTab;
     @Unique private int bs3dPocket$fullHeight;
 
@@ -39,7 +40,7 @@ public abstract class CreativeInventoryScreenMixin
     }
 
     @Inject(method = "<init>", at = @At("RETURN"))
-    private void bs3dPocket$create(Player player, FeatureFlagSet features, boolean operatorTab,
+    private void bs3dPocket$create(LocalPlayer player, FeatureFlagSet features, boolean operatorTab,
                                   CallbackInfo callback) {
         // 记录原版窗口高度，离开物品栏页签时恢复。
         bs3dPocket$fullHeight = imageHeight;
@@ -48,7 +49,7 @@ public abstract class CreativeInventoryScreenMixin
     @Inject(method = "init", at = @At("HEAD"))
     private void bs3dPocket$init(CallbackInfo callback) {
         // 窗口原点始终按原版高度计算，切换页签与布局只移动底边，上排页签与搜索框不跳动。
-        imageHeight = bs3dPocket$fullHeight;
+        bs3dPocket$setHeight(bs3dPocket$fullHeight);
     }
 
     @Inject(method = "selectTab", at = @At("RETURN"))
@@ -57,9 +58,11 @@ public abstract class CreativeInventoryScreenMixin
         bs3dPocket$arrange();
     }
 
-    @Inject(method = "render", at = @At("HEAD"))
-    private void bs3dPocket$render(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo callback) {
-        // 每帧从原版坐标重新排版，窗口缩放与库存同步都会切换紧凑与退回布局。
+    @Inject(method = "extractBackground", at = @At("HEAD"))
+    private void bs3dPocket$frame(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta,
+                                  CallbackInfo callback) {
+        // 背景是每帧最先提取的部分；从原版坐标重新排版，窗口缩放与库存同步都会切换紧凑与退回布局，
+        // 底排页签、背景与槽位随后都按本帧高度提取。
         bs3dPocket$arrange();
     }
 
@@ -86,38 +89,45 @@ public abstract class CreativeInventoryScreenMixin
     private void bs3dPocket$arrange() {
         // 底排页签与点击边界读取同一高度；其他页签恢复原版高度，槽位由原版重新建立。
         if (selectedTab.getType() != CreativeModeTab.Type.INVENTORY) {
-            imageHeight = bs3dPocket$fullHeight;
+            bs3dPocket$setHeight(bs3dPocket$fullHeight);
             return;
         }
         var slices = bs3dPocket$slices();
-        imageHeight = slices.height();
+        bs3dPocket$setHeight(slices.height());
         for (Slot slot : menu.slots) {
             slices.arrange(slot);
         }
     }
 
-    @Redirect(method = "renderBg", at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/GuiGraphics;blit(Lnet/minecraft/resources/ResourceLocation;IIIIII)V",
+    @Unique
+    private void bs3dPocket$setHeight(int heightPixels) {
+        ((ContainerScreenAccess) (Object) this).bs3dPocket$setImageHeight(heightPixels);
+    }
+
+    @Redirect(method = "extractBackground", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;blit(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIFFIIII)V",
             ordinal = 0))
-    private void bs3dPocket$background(GuiGraphics context, ResourceLocation texture, int left, int top,
-                                      int u, int v, int regionWidth, int regionHeight) {
+    private void bs3dPocket$background(GuiGraphicsExtractor context, RenderPipeline pipeline, Identifier texture,
+                                       int left, int top, float u, float v, int regionWidth, int regionHeight,
+                                       int textureWidth, int textureHeight) {
         // 只裁接物品栏页签背景，其他页签与滚动条保持原纹理。
         if (selectedTab.getType() != CreativeModeTab.Type.INVENTORY) {
-            context.blit(texture, left, top, u, v, regionWidth, regionHeight);
+            context.blit(pipeline, texture, left, top, u, v, regionWidth, regionHeight, textureWidth, textureHeight);
             return;
         }
         bs3dPocket$slices().draw(context, texture, left, top);
     }
 
-    @Redirect(method = "renderBg", at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/screens/inventory/InventoryScreen;renderEntityInInventoryFollowsMouse(Lnet/minecraft/client/gui/GuiGraphics;IIIFFLnet/minecraft/world/entity/LivingEntity;)V"))
-    private void bs3dPocket$preview(GuiGraphics context, int x, int y, int size, float mouseX, float mouseY,
-                                   LivingEntity entity) {
+    @Redirect(method = "extractBackground", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/screens/inventory/InventoryScreen;extractEntityInInventoryFollowsMouse(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IIIIIFFFLnet/minecraft/world/entity/LivingEntity;)V"))
+    private void bs3dPocket$preview(GuiGraphicsExtractor context, int x0, int y0, int x1, int y1, int size,
+                                   float offsetY, float mouseX, float mouseY, LivingEntity entity) {
         // 紧凑布局由左侧三维人物代替原版二维预览。
         if (bs3dPocket$compact()) {
             return;
         }
-        InventoryScreen.renderEntityInInventoryFollowsMouse(context, x, y, size, mouseX, mouseY, entity);
+        InventoryScreen.extractEntityInInventoryFollowsMouse(
+                context, x0, y0, x1, y1, size, offsetY, mouseX, mouseY, entity);
     }
 
     @Override

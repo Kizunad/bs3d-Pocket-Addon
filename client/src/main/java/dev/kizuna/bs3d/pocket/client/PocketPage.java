@@ -8,9 +8,10 @@ import dev.kizuna.bs3d.vanilla.client.PlayerInventoryRows;
 import dev.kizuna.bs3d.vanilla.client.PlayerInventoryView;
 import java.util.List;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.Slot;
@@ -18,7 +19,7 @@ import net.minecraft.world.inventory.Slot;
 /** 原版玩家菜单的槽对象保持不变，只按纹理切片平移坐标并裁接原版背景。 */
 public final class PocketPage {
     public static final int WIDTH_PIXELS = 176;
-    private static final ResourceLocation TEXTURE = new ResourceLocation("textures/gui/container/inventory.png");
+    private static final Identifier TEXTURE = Identifier.parse("textures/gui/container/inventory.png");
     private static final int TEXTURE_HEIGHT_PIXELS = 166;
     private static final int TOP_BORDER_PIXELS = 7;
     private static final int MAIN_FRAME_Y = 83;
@@ -46,7 +47,8 @@ public final class PocketPage {
             CRAFTING_BLOCK_V + CRAFTING_BLOCK_HEIGHT_PIXELS + PANEL_PADDING_PIXELS;
     private static final int CRAFTING_ORIGIN_X = CRAFTING_BLOCK_U - PANEL_PADDING_PIXELS;
     private static final int TITLE_Y = 6;
-    private static final int TITLE_COLOR = 0x404040;
+    // 26.x 的文字绘制跳过 alpha 为 0 的颜色，须带不透明 alpha（原版标题色同值）。
+    private static final int TITLE_COLOR = 0xFF404040;
     private static final int WINDOW_CORNER_PIXELS = 4;
     private static final int WINDOW_RIGHT_U = WIDTH_PIXELS - WINDOW_CORNER_PIXELS;
     private static final int WINDOW_BOTTOM_V = TEXTURE_HEIGHT_PIXELS - WINDOW_CORNER_PIXELS;
@@ -87,7 +89,7 @@ public final class PocketPage {
         return !interiorOpen;
     }
 
-    public static void drawCompact(GuiGraphics context, PocketLayout layout, Component title, boolean interiorOpen) {
+    public static void drawCompact(GuiGraphicsExtractor context, PocketLayout layout, Component title, boolean interiorOpen) {
         // 底部只拼接口袋行与快捷栏；合成面板沿用原版窗口边框、合成格纹理和标题位置。
         Rect menu = layout.menu();
         COMPACT.draw(context, TEXTURE, menu.x(), menu.y());
@@ -98,18 +100,18 @@ public final class PocketPage {
         drawWindow(context, area);
         int blockLeft = area.x() - CRAFTING_ORIGIN_X + CRAFTING_BLOCK_U;
         int top = area.y();
-        context.blit(TEXTURE, blockLeft, top + CRAFTING_BLOCK_V,
+        blit(context, blockLeft, top + CRAFTING_BLOCK_V,
                 CRAFTING_BLOCK_U, CRAFTING_BLOCK_V, CRAFTING_BLOCK_WIDTH_PIXELS, CRAFTING_BLOCK_HEIGHT_PIXELS);
         var font = Minecraft.getInstance().font;
-        context.drawString(font, title, blockLeft, top + TITLE_Y, TITLE_COLOR, false /* shadow */);
+        context.text(font, title, blockLeft, top + TITLE_Y, TITLE_COLOR, false /* shadow */);
     }
 
-    public static void drawFallback(GuiGraphics context, ResourceLocation texture, int left, int top) {
+    public static void drawFallback(GuiGraphicsExtractor context, Identifier texture, int left, int top) {
         // 二维人物和盔甲区保持原样，被移除的两行主背包不再绘制。
         FALLBACK.draw(context, texture, left, top);
     }
 
-    private static void drawWindow(GuiGraphics context, Rect area) {
+    private static void drawWindow(GuiGraphicsExtractor context, Rect area) {
         // 四角取原版窗口纹理，边缘沿原版边框延伸，中间填原版底色。
         int corner = WINDOW_CORNER_PIXELS;
         int left = area.x();
@@ -121,13 +123,18 @@ public final class PocketPage {
         int innerWidth = area.width() - corner * 2;
         int innerHeight = area.height() - corner * 2;
         context.fill(innerLeft, innerTop, right, bottom, WINDOW_COLOR);
-        context.blit(TEXTURE, left, top, 0, 0, corner, corner);
-        context.blit(TEXTURE, innerLeft, top, corner, 0, innerWidth, corner);
-        context.blit(TEXTURE, right, top, WINDOW_RIGHT_U, 0, corner, corner);
-        context.blit(TEXTURE, left, innerTop, 0, corner, corner, innerHeight);
-        context.blit(TEXTURE, right, innerTop, WINDOW_RIGHT_U, corner, corner, innerHeight);
-        context.blit(TEXTURE, left, bottom, 0, WINDOW_BOTTOM_V, corner, corner);
-        context.blit(TEXTURE, innerLeft, bottom, corner, WINDOW_BOTTOM_V, innerWidth, corner);
-        context.blit(TEXTURE, right, bottom, WINDOW_RIGHT_U, WINDOW_BOTTOM_V, corner, corner);
+        blit(context, left, top, 0, 0, corner, corner);
+        blit(context, innerLeft, top, corner, 0, innerWidth, corner);
+        blit(context, right, top, WINDOW_RIGHT_U, 0, corner, corner);
+        blit(context, left, innerTop, 0, corner, corner, innerHeight);
+        blit(context, right, innerTop, WINDOW_RIGHT_U, corner, corner, innerHeight);
+        blit(context, left, bottom, 0, WINDOW_BOTTOM_V, corner, corner);
+        blit(context, innerLeft, bottom, corner, WINDOW_BOTTOM_V, innerWidth, corner);
+        blit(context, right, bottom, WINDOW_RIGHT_U, WINDOW_BOTTOM_V, corner, corner);
+    }
+
+    private static void blit(GuiGraphicsExtractor context, int x, int y, int u, int v, int width, int height) {
+        context.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, x, y, u, v, width, height,
+                TextureSlices.TEXTURE_SIZE_PIXELS, TextureSlices.TEXTURE_SIZE_PIXELS);
     }
 }

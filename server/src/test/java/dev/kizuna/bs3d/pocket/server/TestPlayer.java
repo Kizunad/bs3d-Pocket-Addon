@@ -5,10 +5,12 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Abilities;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.PlayerEquipment;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
 
@@ -18,19 +20,21 @@ final class TestPlayer extends ServerPlayer {
     final List<Component> overlays = new ArrayList<>();
 
     private TestPlayer() {
-        super(null, null, null);
+        super(null, null, null, null);
         // 实例只由 create 分配，真实构造需要服务器与世界。
         throw new AssertionError();
     }
 
     static TestPlayer create() throws ReflectiveOperationException {
-        // 库存规则只依赖库存、能力与菜单，三者使用原版构造并写回玩家字段。
+        // 库存规则只依赖库存、装备、能力与菜单，均使用原版构造并写回玩家字段；26.2 的盔甲与副手存放在实体装备中。
         var unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
         unsafeField.setAccessible(true /* flag */);
         var unsafe = (Unsafe) unsafeField.get(null);
         var player = (TestPlayer) unsafe.allocateInstance(TestPlayer.class);
-        var inventory = new Inventory(player);
+        var equipment = new PlayerEquipment(player);
+        var inventory = new Inventory(player, equipment);
         var handler = new InventoryMenu(inventory, true /* onServer */, player);
+        assign(LivingEntity.class, player, "equipment", equipment);
         assign(Player.class, player, "inventory", inventory);
         assign(Player.class, player, "abilities", new Abilities());
         assign(Player.class, player, "inventoryMenu", handler);
@@ -64,14 +68,14 @@ final class TestPlayer extends ServerPlayer {
     }
 
     @Override
-    public ItemEntity drop(ItemStack stack, boolean throwRandomly, boolean retainOwnership) {
+    public ItemEntity drop(ItemStack stack, boolean randomly, boolean thrownFromHand) {
         // 掉落实体需要世界；测试只观察掉出的物品与数量。
         dropped.add(stack.copy());
         return null;
     }
 
     @Override
-    public void displayClientMessage(Component message, boolean overlay) {
+    public void sendOverlayMessage(Component message) {
         overlays.add(message);
     }
 }

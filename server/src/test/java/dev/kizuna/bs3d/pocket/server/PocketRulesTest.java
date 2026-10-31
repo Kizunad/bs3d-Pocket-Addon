@@ -6,10 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.kizuna.bs3d.pocket.api.PocketSlots;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.component.DataComponentInitializers;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -28,6 +31,10 @@ class PocketRulesTest {
     static void bootstrap() {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
+        // 26.2 的物品默认组件（堆叠上限等）在服务器加载数据时才绑定；单元测试没有服务器，按原版内置注册表补绑一次。
+        BuiltInRegistries.DATA_COMPONENT_INITIALIZERS
+                .build(VanillaRegistries.createLookup())
+                .forEach(DataComponentInitializers.PendingComponents::apply);
     }
 
     @Test
@@ -74,15 +81,15 @@ class PocketRulesTest {
         var inventory = player.getInventory();
         assertEquals(LEGACY_SLOT, handler.getSlot(LEGACY_SLOT).getContainerSlot());
         inventory.setItem(LEGACY_SLOT, new ItemStack(Items.DIAMOND, 3));
-        var actions = List.of(ClickType.PICKUP, ClickType.QUICK_MOVE, ClickType.SWAP,
-                ClickType.THROW, ClickType.CLONE, ClickType.PICKUP_ALL);
-        for (ClickType action : actions) {
+        var actions = List.of(ContainerInput.PICKUP, ContainerInput.QUICK_MOVE, ContainerInput.SWAP,
+                ContainerInput.THROW, ContainerInput.CLONE, ContainerInput.PICKUP_ALL);
+        for (ContainerInput action : actions) {
             handler.clicked(LEGACY_SLOT, 0, action, player);
             assertEquals(3, inventory.getItem(LEGACY_SLOT).getCount());
             assertTrue(handler.getCarried().isEmpty());
         }
         handler.setCarried(new ItemStack(Items.EMERALD, 5));
-        handler.clicked(LAST_LEGACY_SLOT, 0, ClickType.PICKUP, player);
+        handler.clicked(LAST_LEGACY_SLOT, 0, ContainerInput.PICKUP, player);
         assertTrue(inventory.getItem(LAST_LEGACY_SLOT).isEmpty());
         assertEquals(5, handler.getCarried().getCount());
         assertTrue(PocketClicks.blocked(handler, LEGACY_SLOT));
@@ -101,12 +108,12 @@ class PocketRulesTest {
         int second = first + 1;
         handler.setCarried(new ItemStack(Items.EMERALD, 10));
         handler.clicked(AbstractContainerMenu.SLOT_CLICKED_OUTSIDE, AbstractContainerMenu.getQuickcraftMask(0, 0),
-                ClickType.QUICK_CRAFT, player);
+                ContainerInput.QUICK_CRAFT, player);
         for (int slot : List.of(first, LEGACY_SLOT, second)) {
-            handler.clicked(slot, AbstractContainerMenu.getQuickcraftMask(1, 0), ClickType.QUICK_CRAFT, player);
+            handler.clicked(slot, AbstractContainerMenu.getQuickcraftMask(1, 0), ContainerInput.QUICK_CRAFT, player);
         }
         handler.clicked(AbstractContainerMenu.SLOT_CLICKED_OUTSIDE, AbstractContainerMenu.getQuickcraftMask(2, 0),
-                ClickType.QUICK_CRAFT, player);
+                ContainerInput.QUICK_CRAFT, player);
         assertEquals(5, inventory.getItem(first).getCount());
         assertEquals(5, inventory.getItem(second).getCount());
         assertTrue(handler.getCarried().isEmpty());
@@ -120,14 +127,14 @@ class PocketRulesTest {
         var handler = player.inventoryMenu;
         var inventory = player.getInventory();
         inventory.setItem(0, new ItemStack(Items.STONE, 5));
-        handler.clicked(InventoryMenu.USE_ROW_SLOT_START, 0, ClickType.QUICK_MOVE, player);
+        handler.clicked(InventoryMenu.USE_ROW_SLOT_START, 0, ContainerInput.QUICK_MOVE, player);
         assertEquals(5, inventory.getItem(InventoryMenu.INV_SLOT_START).getCount());
         assertTrue(inventory.getItem(0).isEmpty());
         for (int slot = PocketSlots.HOTBAR_SLOTS; slot < PocketSlots.AVAILABLE_SLOTS; slot++) {
             inventory.setItem(slot, new ItemStack(Items.DIRT, FULL_STACK));
         }
         inventory.setItem(1, new ItemStack(Items.GOLD_INGOT, 7));
-        handler.clicked(InventoryMenu.USE_ROW_SLOT_START + 1, 0, ClickType.QUICK_MOVE, player);
+        handler.clicked(InventoryMenu.USE_ROW_SLOT_START + 1, 0, ContainerInput.QUICK_MOVE, player);
         assertEquals(7, inventory.getItem(1).getCount());
         assertLegacyEmpty(inventory);
     }

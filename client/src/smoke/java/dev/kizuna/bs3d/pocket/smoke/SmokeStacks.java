@@ -80,8 +80,9 @@ final class SmokeStacks {
     static Map<Item, Integer> ground(Minecraft client) {
         // 平台范围内全部高度的掉落物；夹具平台足以接住整理与死亡时随机抛出的物品。
         var world = client.level;
-        var area = new AABB(-GROUND_RADIUS, world.getMinBuildHeight(), -GROUND_RADIUS,
-                GROUND_RADIUS, world.getMaxBuildHeight(), GROUND_RADIUS);
+        // 26.x 的 getMaxY 是最高一层方块（含），盒子上界取其上一格，与原先的 getMaxBuildHeight 相同。
+        var area = new AABB(-GROUND_RADIUS, world.getMinY(), -GROUND_RADIUS,
+                GROUND_RADIUS, world.getMaxY() + 1, GROUND_RADIUS);
         Map<Item, Integer> totals = new HashMap<>();
         for (ItemEntity entity : world.getEntitiesOfClass(ItemEntity.class, area, entity -> true)) {
             add(totals, entity.getItem());

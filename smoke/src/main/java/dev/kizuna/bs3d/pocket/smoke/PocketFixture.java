@@ -13,6 +13,7 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
@@ -25,6 +26,7 @@ import net.minecraft.world.level.block.Blocks;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** 隔离世界的口袋验收夹具：固定初始库存、真实箱子，以及在离线存档里写入旧槽位物品。 */
@@ -37,7 +39,6 @@ public final class PocketFixture implements ModInitializer {
     public static final int STONE_COUNT = 5;
     public static final int INGOT_SLOT = 1;
     public static final int HEAD_SLOT = Inventory.INVENTORY_SIZE + EquipmentSlot.HEAD.getIndex();
-    private static final int OPERATOR_LEVEL = 2;
     // 随机抛出的掉落物离脚边至多约七格；平台接住它们，免得落下高空时漂出地面统计范围。
     private static final int PLATFORM_RADIUS = 8;
     private static final int PLATFORM_Y = 64;
@@ -52,7 +53,7 @@ public final class PocketFixture implements ModInitializer {
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> leave(handler.player, server));
         CommandRegistrationCallback.EVENT.register((dispatcher, registries, environment) -> {
             var command = Commands.literal("pocket-fixture")
-                    .requires(source -> source.hasPermission(OPERATOR_LEVEL));
+                    .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS));
             command.then(Commands.literal("chest")
                     .executes(context -> chest(context.getSource().getPlayerOrException())));
             command.then(Commands.literal("legacy")
@@ -63,15 +64,15 @@ public final class PocketFixture implements ModInitializer {
 
     private static void seed(ServerPlayer player) {
         // 固定平台与模式；只有首次进入写入铁锭、头盔和装着原木的草包。
-        var server = player.getServer();
-        server.getPlayerList().op(player.getGameProfile());
-        var world = player.serverLevel();
+        var world = player.level();
+        world.getServer().getPlayerList().op(player.nameAndId());
         for (int x = -PLATFORM_RADIUS; x <= PLATFORM_RADIUS; x++) {
             for (int z = -PLATFORM_RADIUS; z <= PLATFORM_RADIUS; z++) {
                 world.setBlockAndUpdate(new BlockPos(x, PLATFORM_Y, z), Blocks.STONE.defaultBlockState());
             }
         }
-        player.teleportTo(world, BLOCK_CENTER, PLATFORM_Y + 1, BLOCK_CENTER, 0, 0);
+        player.teleportTo(world, BLOCK_CENTER, PLATFORM_Y + 1, BLOCK_CENTER,
+                Set.of() /* 绝对坐标 */, 0, 0, true /* 镜头回到自身 */);
         player.setGameMode(GameType.SURVIVAL);
         var account = new PlayerAccount(player);
         if (account.data().getRevision() > 0) {
@@ -86,7 +87,7 @@ public final class PocketFixture implements ModInitializer {
         var data = account.data().toBuilder()
                 .setRevision(1)
                 .clearWorn()
-                .addWorn(pouch())
+                .addWorn(pouch(player.registryAccess()))
                 .build();
         try {
             account.commit(data, slots);
@@ -95,7 +96,7 @@ public final class PocketFixture implements ModInitializer {
         }
     }
 
-    private static WornContainer pouch() {
+    private static WornContainer pouch(HolderLookup.Provider registries) {
         // 草包内放一组原木，供内景拖到快捷栏和 2×2 合成使用。
         var pouch = ContainerItems.create(ContainerItems.POUCH);
         var logs = Item.newBuilder()
@@ -103,19 +104,19 @@ public final class PocketFixture implements ModInitializer {
                 .setContainer(ContainerItems.identity(pouch))
                 .setSize(Volumes.UNIT)
                 .setBaseSize(Volumes.UNIT)
-                .setStackNbt(StackCodec.encode(new ItemStack(Items.OAK_LOG, LOG_COUNT)))
+                .setStackNbt(StackCodec.encode(new ItemStack(Items.OAK_LOG, LOG_COUNT), registries))
                 .build();
         ContainerItems.setContents(pouch, List.of(logs));
         return WornContainer.newBuilder()
                 .setMount(Mount.WAIST_RIGHT_FRONT)
-                .setStackNbt(StackCodec.encode(pouch))
+                .setStackNbt(StackCodec.encode(pouch, registries))
                 .build();
     }
 
     private static int chest(ServerPlayer player) {
         // 真实箱子方块实体，第一格放石头供 Shift 搬运检查。
         var pos = player.blockPosition().east(DISTANCE_BLOCKS);
-        var world = player.serverLevel();
+        var world = player.level();
         world.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
         var state = Blocks.CHEST.defaultBlockState();
         world.setBlockAndUpdate(pos, state);

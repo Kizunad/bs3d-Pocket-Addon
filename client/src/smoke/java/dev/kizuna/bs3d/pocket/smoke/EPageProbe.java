@@ -72,7 +72,7 @@ final class EPageProbe {
 
     private static boolean open(Minecraft client) {
         // 无页面时按物品栏键，由客户端 tick 按原版流程打开 E 页。
-        if (client.screen != null) {
+        if (client.gui.screen() != null) {
             return false;
         }
         SmokeInput.pressKey(client.options.keyInventory);
@@ -81,7 +81,7 @@ final class EPageProbe {
 
     private static AbstractContainerScreen<?> ready(Minecraft client) {
         // 只在 E 页、附属状态就绪且没有等待中的转移时推进。
-        if (!(client.screen instanceof InventoryScreen screen)) {
+        if (!(client.gui.screen() instanceof InventoryScreen screen)) {
             return null;
         }
         var addon = VanillaClient.instance();

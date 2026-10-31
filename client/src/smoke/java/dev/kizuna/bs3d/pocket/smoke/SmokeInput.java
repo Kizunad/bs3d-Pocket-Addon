@@ -1,17 +1,19 @@
 package dev.kizuna.bs3d.pocket.smoke;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import dev.kizuna.backpack3d.client.InteriorRenderer;
 import dev.kizuna.backpack3d.client.InteriorRenderer.Rect;
 import dev.kizuna.backpack3d.client.WornPreview;
 import dev.kizuna.bs3d.vanilla.client.StationHost;
 import dev.kizuna.bs3d.vanilla.client.StationPanel;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.input.MouseButtonInfo;
 import net.minecraft.world.inventory.Slot;
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -27,12 +29,12 @@ final class SmokeInput {
 
     static void pressKey(KeyMapping binding) {
         // 与键盘回调相同地累计按下次数，客户端 tick 按原版流程打开页面。
-        KeyMapping.click(KeyBindingHelper.getBoundKeyOf(binding));
+        KeyMapping.click(KeyMappingHelper.getBoundKeyOf(binding));
     }
 
     static void closeWithKey(AbstractContainerScreen<?> screen, KeyMapping binding) {
         // 页面内再次按物品栏键，走原版 keyPressed 关闭路径。
-        screen.keyPressed(KeyBindingHelper.getBoundKeyOf(binding).getValue(), 0, 0);
+        screen.keyPressed(new KeyEvent(KeyMappingHelper.getBoundKeyOf(binding).getValue(), 0, 0));
     }
 
     static int[] slotPoint(AbstractContainerScreen<?> screen, Slot slot) {
@@ -44,15 +46,20 @@ final class SmokeInput {
 
     static void click(Screen screen, int[] point) {
         // 完整按下和松开，不留下上一轮的拖动捕获。
-        screen.mouseClicked(point[0], point[1], 0);
-        screen.mouseReleased(point[0], point[1], 0);
+        var event = leftButton(point);
+        screen.mouseClicked(event, false /* doubleClick */);
+        screen.mouseReleased(event);
     }
 
     static void drag(AbstractContainerScreen<?> screen, int[] source, int[] target) {
         // 按下、移动、松开三步全部经过页面入口，由附属决定来源与落点。
-        screen.mouseClicked(source[0], source[1], 0);
-        screen.mouseDragged(target[0], target[1], 0, target[0] - source[0], target[1] - source[1]);
-        screen.mouseReleased(target[0], target[1], 0);
+        screen.mouseClicked(leftButton(source), false /* doubleClick */);
+        screen.mouseDragged(leftButton(target), target[0] - source[0], target[1] - source[1]);
+        screen.mouseReleased(leftButton(target));
+    }
+
+    private static MouseButtonEvent leftButton(int[] point) {
+        return new MouseButtonEvent(point[0], point[1], new MouseButtonInfo(0 /* 左键 */, 0 /* 无修饰键 */));
     }
 
     static int[] modelPoint(AbstractContainerScreen<?> screen, String bag) {
@@ -142,12 +149,10 @@ final class SmokeInput {
     }
 
     static AtomicBoolean screenshot(Minecraft client, String name) {
-        // tick 内帧缓冲仍是上一帧；排到本帧绘制完成、交换缓冲之前再读，画面与本 tick 的状态一致。
+        // 复制最近一帧的帧缓冲，文件在 IO 线程写完后回调；何时调用由 Evidence 按帧号决定。
         var saved = new AtomicBoolean();
-        RenderSystem.recordRenderCall(() -> {
-            Screenshot.grab(client.gameDirectory, name, client.getMainRenderTarget(), message -> {});
-            saved.set(true /* saved */);
-        });
+        Screenshot.grab(client.gameDirectory, name, client.gameRenderer.mainRenderTarget(), 1,
+                message -> saved.set(true /* saved */));
         return saved;
     }
 

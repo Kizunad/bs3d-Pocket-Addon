@@ -18,6 +18,7 @@ final class LegacyProbe {
     private static final String RESPAWN_KEY = "deathScreen.respawn";
     private final Evidence evidence = new Evidence();
     private boolean armed;
+    private boolean legacyShot;
     private int ticks;
     private int deathStep;
     private int carriedBeforeDeath;
@@ -36,7 +37,7 @@ final class LegacyProbe {
 
     boolean migrated(Minecraft client, int overlays) {
         // 重登后鹅卵石依次进入口袋、随身容器、脚边，合计不变且提示只出现一次。
-        if (client.screen != null) {
+        if (client.gui.screen() != null) {
             // 地形加载页关闭前实体可能已同步，等回到游戏画面再截图核对。
             ticks = 0;
             return false;
@@ -49,11 +50,12 @@ final class LegacyProbe {
             ticks = 0;
             return false;
         }
-        if (ticks++ == 0) {
-            // 动作栏提示只停留数秒，数量首次对齐时立即截图。
-            SmokeInput.screenshot(client, "pocket-legacy.png");
+        ticks++;
+        if (!legacyShot) {
+            // 动作栏提示只停留数秒，数量首次对齐后的下一帧就截图。
+            legacyShot = evidence.captured(client, "pocket-legacy.png");
         }
-        if (ticks < SETTLE_TICKS) {
+        if (!legacyShot || ticks < SETTLE_TICKS) {
             return false;
         }
         SmokeInput.require(SmokeStacks.removedEmpty(inventory), "旧槽位物品没有迁出");
@@ -91,7 +93,7 @@ final class LegacyProbe {
 
     private boolean dropped(Minecraft client) {
         // 死亡页出现后，地面每种物品的数量都要等于死亡前库存加地面。
-        if (!(client.screen instanceof DeathScreen)) {
+        if (!(client.gui.screen() instanceof DeathScreen)) {
             return false;
         }
         if (!SmokeStacks.ground(client).equals(beforeDeath)) {
@@ -102,7 +104,7 @@ final class LegacyProbe {
 
     private static boolean respawn(Minecraft client) {
         // 等原版重生按钮启用后点击它。
-        if (!(client.screen instanceof DeathScreen screen)) {
+        if (!(client.gui.screen() instanceof DeathScreen screen)) {
             throw new IllegalStateException("死亡页提前关闭");
         }
         var button = screen.children().stream()
@@ -129,7 +131,7 @@ final class LegacyProbe {
 
     private boolean respawned(Minecraft client) {
         // 重生后旧槽仍为空，随身草包与其中的鹅卵石原样保留。
-        if (!client.player.isAlive() || client.screen instanceof DeathScreen) {
+        if (!client.player.isAlive() || client.gui.screen() instanceof DeathScreen) {
             return false;
         }
         if (SmokeStacks.carried(Items.COBBLESTONE) != carriedBeforeDeath) {

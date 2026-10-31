@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Inventory.class)
 public abstract class PlayerInventoryMixin {
-    @Redirect(method = {"getFreeSlot", "getSlotWithRemainingSpace", "findSlotMatchingItem", "findSlotMatchingUnusedItem"},
+    @Redirect(method = {"getFreeSlot", "getSlotWithRemainingSpace", "findSlotMatchingItem", "findSlotMatchingCraftingIngredient"},
             at = @At(value = "INVOKE", target = "Lnet/minecraft/core/NonNullList;size()I"))
     private int bs3dPocket$searchLimit(NonNullList<ItemStack> stacks) {
         // 存档仍是 36 格，自动寻位只扫描口袋与快捷栏；选中格和副手的原版合并优先级不变。

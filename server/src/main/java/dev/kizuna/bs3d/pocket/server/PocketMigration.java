@@ -42,7 +42,7 @@ public final class PocketMigration {
         player.inventoryMenu.broadcastChanges();
         player.containerMenu.broadcastChanges();
         if (dropped > 0) {
-            player.displayClientMessage(Component.translatable(OVERFLOW_KEY), true /* overlay */);
+            player.sendOverlayMessage(Component.translatable(OVERFLOW_KEY));
         }
         LOGGER.info("整理玩家 {} 的旧背包槽：迁出 {} 件，掉落 {} 件", player.getStringUUID(), moved, dropped);
     }
@@ -57,7 +57,7 @@ public final class PocketMigration {
             return 0;
         }
         int dropped = stack.getCount();
-        player.drop(stack, true /* throwRandomly */, false /* retainOwnership */);
+        player.drop(stack, true /* randomly */, false /* thrownFromHand */);
         return dropped;
     }
 

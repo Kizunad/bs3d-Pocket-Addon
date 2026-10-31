@@ -10,6 +10,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.core.registries.Registries;
@@ -17,7 +18,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
@@ -61,6 +61,7 @@ public final class PocketSmokeClient implements ClientModInitializer {
         integrated = System.getProperty("pocket.smoke.mode", "dedicated").equals("integrated");
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
         ClientReceiveMessageEvents.GAME.register(this::message);
+        Evidence.countFrames();
     }
 
     private void message(Component message, boolean overlay) {
@@ -80,8 +81,8 @@ public final class PocketSmokeClient implements ClientModInitializer {
     private void tick(Minecraft client) {
         // 每阶段等真实状态后再推进，失败日志保留具体阶段。
         watch();
-        if (client.screen instanceof AccessibilityOnboardingScreen) {
-            client.setScreen(new TitleScreen());
+        if (client.gui.screen() instanceof AccessibilityOnboardingScreen) {
+            client.gui.setScreen(new TitleScreen());
         }
         if (stage == Stage.CONNECT || stage == Stage.RELOG) {
             connect(client);
@@ -91,7 +92,7 @@ public final class PocketSmokeClient implements ClientModInitializer {
         if (client.player == null || addon == null || !addon.volume().ready()) {
             return;
         }
-        client.getToasts().clear();
+        client.gui.toastManager().clear();
         advance(client);
     }
 
@@ -144,34 +145,38 @@ public final class PocketSmokeClient implements ClientModInitializer {
 
     private void connect(Minecraft client) {
         // 首次进入与重登都等标题页空闲，重登进入同一独服或同一单机存档。
-        if (client.player != null || client.getOverlay() != null) {
+        if (client.player != null || client.gui.overlay() != null) {
             return;
         }
-        if (!(client.screen instanceof TitleScreen)) {
+        if (!(client.gui.screen() instanceof TitleScreen)) {
             return;
         }
         boolean first = stage == Stage.CONNECT;
         stage = first ? Stage.INITIAL : Stage.RELOGGED;
         if (!integrated) {
             String address = System.getProperty("pocket.smoke.address", "127.0.0.1:25587");
-            var info = new ServerData("Pocket smoke", address, false /* local */);
-            ConnectScreen.startConnecting(new TitleScreen(), client, ServerAddress.parseString(address), info, false /* quickPlay */);
+            var info = new ServerData("Pocket smoke", address, ServerData.Type.OTHER);
+            ConnectScreen.startConnecting(new TitleScreen(), client, ServerAddress.parseString(address), info,
+                    false /* quickPlay */, null /* transferState */);
         } else if (first) {
             createWorld(client);
         } else {
-            client.createWorldOpenFlows().loadLevel(new TitleScreen(), WORLD);
+            client.createWorldOpenFlows().openWorld(WORLD, () -> client.gui.setScreen(new TitleScreen()));
         }
     }
 
     private static void createWorld(Minecraft client) {
         // 超平坦和平世界，夹具在进入时搭建固定平台。
-        var info = new LevelSettings(WORLD, GameType.SURVIVAL, false /* hardcore */, Difficulty.PEACEFUL,
-                true /* allowCommands */, new GameRules(), WorldDataConfiguration.DEFAULT);
+        var info = new LevelSettings(WORLD, GameType.SURVIVAL,
+                new LevelSettings.DifficultySettings(Difficulty.PEACEFUL, false /* hardcore */, false /* locked */),
+                true /* allowCommands */, WorldDataConfiguration.DEFAULT);
         var options = new WorldOptions(WORLD_SEED, false /* generateStructures */, false /* bonusChest */);
         client.createWorldOpenFlows().createFreshLevel(WORLD, info, options,
-                registry -> registry.registryOrThrow(Registries.WORLD_PRESET)
+                registry -> registry.lookupOrThrow(Registries.WORLD_PRESET)
                         .getOrThrow(WorldPresets.FLAT)
-                        .createWorldDimensions());
+                        .value()
+                        .createWorldDimensions(),
+                new TitleScreen());
     }
 
     private void initial(Minecraft client) {
@@ -222,9 +227,8 @@ public final class PocketSmokeClient implements ClientModInitializer {
     }
 
     private static void disconnect(Minecraft client) {
-        if (client.level != null) {
-            client.level.disconnect();
-        }
-        client.clearLevel(new TitleScreen());
+        // 断开远程服务器后原版停在多人游戏列表，回到标题页供重登步骤识别。
+        client.disconnectFromWorld(ClientLevel.DEFAULT_QUIT_MESSAGE);
+        client.gui.setScreen(new TitleScreen());
     }
 }

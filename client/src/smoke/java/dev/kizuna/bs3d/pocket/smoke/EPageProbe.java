@@ -101,7 +101,7 @@ final class EPageProbe {
     }
 
     private boolean openBag(AbstractContainerScreen<?> screen) {
-        // 点击人物身上的草包模型打开内景；背面时旋转人物继续寻找。
+        // 点击人物身上的灵草囊模型打开内景；背面时旋转人物继续寻找。
         int[] point = SmokeInput.modelPoint(screen, bag);
         if (point == null) {
             SmokeInput.read(SmokeInput.panel(screen), "player", WornPreview.class).rotate(MODEL_SEARCH_DEGREES, 0);

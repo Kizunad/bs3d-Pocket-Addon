@@ -14,6 +14,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
@@ -44,6 +45,7 @@ public final class PocketFixture implements ModInitializer {
     private static final int PLATFORM_Y = 64;
     private static final int DISTANCE_BLOCKS = 2;
     private static final double BLOCK_CENTER = 0.5;
+    private static final Identifier POUCH = Identifier.fromNamespaceAndPath("bs3d", "herb_pouch");
     private static boolean legacyArmed;
 
     @Override
@@ -63,7 +65,7 @@ public final class PocketFixture implements ModInitializer {
     }
 
     private static void seed(ServerPlayer player) {
-        // 固定平台与模式；只有首次进入写入铁锭、头盔和装着原木的草包。
+        // 固定平台与模式；只有首次进入写入铁锭、头盔和装着原木的灵草囊。
         var world = player.level();
         world.getServer().getPlayerList().op(player.nameAndId());
         for (int x = -PLATFORM_RADIUS; x <= PLATFORM_RADIUS; x++) {
@@ -97,8 +99,8 @@ public final class PocketFixture implements ModInitializer {
     }
 
     private static WornContainer pouch(HolderLookup.Provider registries) {
-        // 草包内放一组原木，供内景拖到快捷栏和 2×2 合成使用。
-        var pouch = ContainerItems.create(ContainerItems.POUCH);
+        // 灵草囊内放一组原木，供内景拖到快捷栏和 2×2 合成使用。
+        var pouch = ContainerItems.create(POUCH);
         var logs = Item.newBuilder()
                 .setId(UUID.randomUUID().toString())
                 .setContainer(ContainerItems.identity(pouch))

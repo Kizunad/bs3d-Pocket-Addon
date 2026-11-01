@@ -130,7 +130,7 @@ final class LegacyProbe {
     }
 
     private boolean respawned(Minecraft client) {
-        // 重生后旧槽仍为空，随身草包与其中的鹅卵石原样保留。
+        // 重生后旧槽仍为空，随身灵草囊与其中的鹅卵石原样保留。
         if (!client.player.isAlive() || client.gui.screen() instanceof DeathScreen) {
             return false;
         }

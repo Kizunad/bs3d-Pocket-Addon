@@ -1,5 +1,7 @@
 package dev.kizuna.bs3d.pocket.server;
 
+import dev.kizuna.backpack3d.server.PlayerStorage;
+import dev.kizuna.backpack3d.service.TransferService;
 import sun.misc.Unsafe;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +33,8 @@ final class TestPlayer extends ServerPlayer {
         unsafeField.setAccessible(true /* flag */);
         var unsafe = (Unsafe) unsafeField.get(null);
         var player = (TestPlayer) unsafe.allocateInstance(TestPlayer.class);
+        // allocateInstance 同样跳过 BS3D Mixin 字段初始化，装备校验仍需要合法的空库存。
+        ((PlayerStorage) (Object) player).bs3d$setInventory(TransferService.empty());
         var equipment = new PlayerEquipment(player);
         var inventory = new Inventory(player, equipment);
         var handler = new InventoryMenu(inventory, true /* onServer */, player);

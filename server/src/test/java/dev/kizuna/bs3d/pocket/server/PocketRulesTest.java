@@ -9,6 +9,7 @@ import net.minecraft.SharedConstants;
 import net.minecraft.core.component.DataComponentInitializers;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.registries.VanillaRegistries;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -26,6 +27,20 @@ class PocketRulesTest {
     private static final int FULL_STACK = 64;
     private static final int LEGACY_SLOT = PocketSlots.AVAILABLE_SLOTS;
     private static final int LAST_LEGACY_SLOT = PocketSlots.VANILLA_MAIN_SLOTS - 1;
+
+    @Test
+    void slotCountIsExplainedOnTheFirstLoginOnly() throws ReflectiveOperationException {
+        // 第一次说随身只有 18 格并记在玩家身上；带着标签再进来不再说。
+        TestPlayer player = TestPlayer.create();
+        PocketHints.slots(player);
+        assertEquals(1, player.chats.size());
+        var told = (TranslatableContents) player.chats.get(0).getContents();
+        assertEquals(PocketHints.SLOTS_KEY, told.getKey());
+        assertEquals(PocketSlots.AVAILABLE_SLOTS, told.getArgs()[0]);
+        assertTrue(player.entityTags().contains(PocketHints.SLOTS_TAG));
+        PocketHints.slots(player);
+        assertEquals(1, player.chats.size());
+    }
 
     @BeforeAll
     static void bootstrap() {

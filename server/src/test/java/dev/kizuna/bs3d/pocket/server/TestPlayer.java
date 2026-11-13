@@ -4,9 +4,11 @@ import dev.kizuna.backpack3d.server.PlayerStorage;
 import dev.kizuna.backpack3d.service.TransferService;
 import sun.misc.Unsafe;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Abilities;
@@ -20,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
 final class TestPlayer extends ServerPlayer {
     final List<ItemStack> dropped = new ArrayList<>();
     final List<Component> overlays = new ArrayList<>();
+    final List<Component> chats = new ArrayList<>();
 
     private TestPlayer() {
         super(null, null, null, null);
@@ -44,6 +47,8 @@ final class TestPlayer extends ServerPlayer {
         assign(Player.class, player, "inventoryMenu", handler);
         assign(TestPlayer.class, player, "dropped", new ArrayList<ItemStack>());
         assign(TestPlayer.class, player, "overlays", new ArrayList<Component>());
+        assign(TestPlayer.class, player, "chats", new ArrayList<Component>());
+        assign(Entity.class, player, "tags", new HashSet<String>());
         player.containerMenu = handler;
         return player;
     }
@@ -81,5 +86,11 @@ final class TestPlayer extends ServerPlayer {
     @Override
     public void sendOverlayMessage(Component message) {
         overlays.add(message);
+    }
+
+    @Override
+    public void sendSystemMessage(Component message) {
+        // 聊天栏的系统消息没有连接可发，记下来给断言看。
+        chats.add(message);
     }
 }

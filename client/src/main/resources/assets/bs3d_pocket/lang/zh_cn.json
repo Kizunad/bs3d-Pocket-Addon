@@ -1,3 +1,4 @@
 {
-  "bs3d_pocket.overflow": "口袋装不下的东西掉在了地上"
+  "bs3d_pocket.overflow": "口袋装不下的东西掉在了地上",
+  "bs3d_pocket.hint.slots": "随身只有快捷栏和一行贴身口袋，共 %s 格；装不下的要放进背包这类随身容器。"
 }

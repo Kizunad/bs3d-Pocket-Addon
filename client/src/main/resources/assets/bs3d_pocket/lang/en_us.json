@@ -1,3 +1,4 @@
 {
-  "bs3d_pocket.overflow": "Items that did not fit in your pockets were dropped at your feet"
+  "bs3d_pocket.overflow": "Items that did not fit in your pockets were dropped at your feet",
+  "bs3d_pocket.hint.slots": "You carry only the hotbar and one row of pockets, %s slots in all; anything more has to go into backpacks and other worn containers."
 }

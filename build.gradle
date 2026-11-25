@@ -6,7 +6,7 @@ plugins {
 subprojects {
     apply plugin: 'net.fabricmc.fabric-loom'
     group = 'dev.kizuna.bs3d.pocket'
-    version = '0.1.0-SNAPSHOT'
+    version = '0.1.0'
     base.archivesName = "bs3d-pocket-addon-${project.name}"
     repositories {
         maven { url = 'https://maven.fabricmc.net/' }
@@ -42,7 +42,11 @@ subprojects {
     test { useJUnitPlatform() }
     processResources {
         inputs.property 'version', project.version
-        filesMatching('fabric.mod.json') { expand version: project.version }
+        def preserveJsonEscapes = true
+        inputs.property 'preserveJsonEscapes', preserveJsonEscapes
+        filesMatching('fabric.mod.json') {
+            expand([version: project.version]) { escapeBackslash = preserveJsonEscapes }
+        }
     }
     jar { from rootProject.file('LICENSE') }
     loom {

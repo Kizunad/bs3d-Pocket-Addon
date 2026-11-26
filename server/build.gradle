@@ -5,7 +5,11 @@ dependencies {
     implementation 'dev.kizuna.bs3d.vanilla:server'
     testImplementation libs.fabric.junit
 }
-test { systemProperty 'fabric.side', 'server' }
+test {
+    systemProperty 'fabric.side', 'server'
+    workingDir layout.buildDirectory.dir('test-runtime')
+    doFirst { workingDir.mkdirs() }
+}
 loom.runs {
     smoke {
         server()
